@@ -5,56 +5,62 @@ namespace App\Http\Controllers;
 use App\Models\Visit;
 use App\Models\Item;
 use App\Models\Borrowing;
+use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class VisitController extends Controller
 {
-    // 1. Method untuk menampilkan Form (Halaman Utama)
+    // 1. Form Tap In
     public function create()
     {
-        // Ambil barang yang stoknya ada saja
         $items = Item::where('current_stock', '>', 0)->get();
+
         return view('visit.form', compact('items'));
     }
 
-    // 2. Method untuk memproses data (Store/Tap In)
+    // 2. Proses Tap In
     public function store(Request $request)
     {
-        // 1. Validasi Input Standar
         $request->validate([
-            'visitor_name' => 'required',
-            'visitor_id' => 'required',
-            'purpose' => 'required',
-            'item_id' => 'nullable|required_if:purpose,pinjam',
-            'quantity' => 'nullable|required_if:purpose,pinjam|integer|min:1',
+            'visitor_id' => 'required',                     // NIM saja
+            'purpose'    => 'required|in:belajar,pinjam',
+            'item_id'    => 'nullable|required_if:purpose,pinjam',
+            'quantity'   => 'nullable|required_if:purpose,pinjam|integer|min:1',
         ]);
 
-        // --- LOGIKA PENGECEKAN STOK SAAT TAP IN ---
-        if ($request->purpose == 'pinjam') {
+        // Cari mahasiswa berdasarkan NIM
+        $student = Student::where('nim', $request->visitor_id)->first();
+
+        if (!$student) {
+            return back()
+                ->withInput()
+                ->with('error', 'NIM tidak terdaftar di data mahasiswa.');
+        }
+
+        // Cek stok kalau meminjam
+        if ($request->purpose === 'pinjam') {
             $item = Item::findOrFail($request->item_id);
 
-            // Cek stok
             if ($item->current_stock < $request->quantity) {
-                return redirect()->back()
-                    ->withInput() 
-                    ->with('error', 'Gagal Tap In! Stok barang ' . $item->name . ' hanya tersisa ' . $item->current_stock . ' unit.');
+                return back()
+                    ->withInput()
+                    ->with('error', 'Stok barang '.$item->name.' hanya tersisa '.$item->current_stock.' unit.');
             }
         }
-        // Logika peminjaman + update stok (di dalam transaksi)----------------
 
-        DB::transaction(function () use ($request) {
-            
-            // Simpan Data Kunjungan (KEMBALI KE ASAL: Tanpa status 'active')
+        // Simpan visit + borrowing di dalam transaksi
+        DB::transaction(function () use ($request, $student, &$visit) {
+
+            // Simpan data kunjungan
             $visit = Visit::create([
-                'visitor_name' => $request->visitor_name,
-                'visitor_id' => $request->visitor_id,
-                'purpose' => $request->purpose,
+                'visitor_name' => $student->name,   // otomatis dari tabel students
+                'visitor_id'   => $student->nim,
+                'purpose'      => $request->purpose,
             ]);
 
-            // Logika Jika Meminjam Barang
-            if ($request->purpose == 'pinjam') {
-                $item = Item::lockForUpdate()->findOrFail($request->item_id); 
+            if ($request->purpose === 'pinjam') {
+                $item = Item::lockForUpdate()->findOrFail($request->item_id);
 
                 Borrowing::create([
                     'visit_id' => $visit->id,
@@ -63,28 +69,33 @@ class VisitController extends Controller
                     'status'   => 'dipinjam',
                 ]);
 
-                // Kurangi Stok
-                $item->decrement('current_stock', $request->quantity); 
+                $item->decrement('current_stock', $request->quantity);
             }
         });
 
-        return redirect()->back()->with('success', 'Berhasil Tap In!');
+        // Setelah sukses, arahkan ke halaman "Selamat Datang"
+        return redirect()->route('visit.welcome', $visit->id);
     }
 
-    // 3. Menampilkan Halaman Form Tap Out
+    // 3. Halaman sambutan setelah Tap In
+    public function welcome(Visit $visit)
+    {
+        return view('visit.welcome', compact('visit'));
+    }
+
+    // 4. Form Tap Out tetap seperti punyamu (NIM saja)
     public function tapOutForm()
     {
         return view('visit.tap-out');
     }
 
-    // 4. Proses Tap Out (Hapus Data Peminjaman & Kembalikan Stok, TAPI RIWAYAT TETAP ADA)
+    // 5. Proses Tap Out -> redirect ke halaman ucapan penutup
     public function tapOutProcess(Request $request)
     {
         $request->validate([
             'visitor_id' => 'required'
         ]);
 
-        // ROLLBACK: Ambil SEMUA data kunjungan berdasarkan NIM (Tanpa cek status)
         $visits = Visit::where('visitor_id', $request->visitor_id)->get();
 
         if ($visits->isEmpty()) {
@@ -93,35 +104,36 @@ class VisitController extends Controller
 
         DB::transaction(function () use ($visits) {
             foreach ($visits as $visit) {
-                
-                // Ambil barang yang dipinjam
-                $borrowings = \App\Models\Borrowing::where('visit_id', $visit->id)->get();
+                $borrowings = Borrowing::where('visit_id', $visit->id)->get();
 
                 foreach ($borrowings as $borrow) {
-                    $item = \App\Models\Item::find($borrow->item_id);
-                    
+                    $item = $borrow->item;
+
                     if ($item) {
-                        // Kembalikan Stok (Dengan Safety Check)
                         $newStock = $item->current_stock + $borrow->quantity;
-                        
                         $item->current_stock = min($newStock, $item->total_stock);
                         $item->save();
-
                     }
-    
+
+                    // JANGAN delete; cukup update status agar histori tetap ada
+                    $borrow->update([
+                        'status'      => 'dikembalikan',
+                        'returned_at' => now(),
+                    ]);
                 }
-
-                //jangan dihapus, biarkan sebagai riwayat
-                $borrow->update([
-                    'status'      => 'dikembalikan',
-                    'returned_at' => now(),
-                ]);
-
-                // ROLLBACK: TIDAK ADA UPDATE STATUS MENJADI COMPLETED
-                // Biarkan data visit tetap ada sebagai riwayat.
             }
         });
 
-        return back()->with('success', 'Tap Out Berhasil! Tanggungan peminjaman telah dikembalikan.');
+        return redirect()->route('visit.goodbye', ['visitor_id' => $request->visitor_id]);
+    }
+
+    // 6. Halaman ucapan setelah Tap Out
+    public function goodbye($visitor_id)
+    {
+        $latestVisit = Visit::where('visitor_id', $visitor_id)->latest()->first();
+
+        $name = $latestVisit?->visitor_name ?? 'Pengunjung';
+
+        return view('visit.goodbye', compact('name'));
     }
 }

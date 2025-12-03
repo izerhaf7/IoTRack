@@ -76,8 +76,25 @@ class AdminController extends Controller
 
     public function destroyVisit($id)
     {
-        $visit = Visit::findOrFail($id);
-        $visit->delete();
-        return back()->with('success', 'Riwayat kunjungan berhasil dihapus.');
+        $visit = Visit::with('borrowings')->findOrFail($id);
+
+        // 1. Cek apakah masih ada peminjaman aktif
+        $hasActiveBorrowing = $visit->borrowings->contains('status', 'dipinjam');
+
+        if ($hasActiveBorrowing) {
+            return back()->with('error', 'Tidak dapat menghapus riwayat kunjungan yang masih memiliki peminjaman aktif.');
+        }
+
+        DB::transaction(function () use ($visit) {
+            // 2. Hapus semua borrowing yang terkait (status dikembalikan)
+            foreach ($visit->borrowings as $borrow) {
+                $borrow->delete(); // kalau pakai SoftDeletes, ini soft delete
+            }
+
+            // 3. Baru hapus visit
+            $visit->delete();
+        });
+
+        return back()->with('success', 'Riwayat kunjungan dan data peminjaman terkait berhasil dihapus.');
     }
 }

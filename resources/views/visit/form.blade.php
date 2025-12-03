@@ -10,33 +10,44 @@
     <style>
         body {
             background-color: #f8f9fa;
-            /* GANTI height jadi min-height agar bisa discroll */
-            min-height: 100vh; 
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
         }
         .card-custom {
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); /* Bayangan lebih halus */
-            border: none; /* Hilangkan garis border bawaan */
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            border: none;
             border-radius: 15px;
-            overflow: hidden; /* Agar header tidak keluar radius */
+            overflow: hidden;
         }
         .header-lab {
-            background: linear-gradient(135deg, #0d6efd, #0a58ca); /* Gradasi Biru */
+            background: linear-gradient(135deg, #0d6efd, #0a58ca);
             color: white;
             padding: 25px;
             text-align: center;
         }
-        /* Perbaikan tampilan di Mobile */
         @media (max-width: 576px) {
             .container { padding-left: 10px; padding-right: 10px; }
+        }
+
+        /* Animasi buka/tutup Detail Peminjaman */
+        #borrowDetailBox {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease, opacity 0.3s ease;
+        }
+
+        #borrowDetailBox.active {
+            max-height: 500px;   /* cukup besar supaya muat isi */
+            opacity: 1;
         }
     </style>
 </head>
 <body>
 
-<!-- Tombol Login Admin Melayang -->
+{{-- Tombol Login Admin --}}
 <div class="position-absolute top-0 end-0 p-3">
     <a href="{{ route('login') }}" class="btn btn-outline-secondary btn-sm rounded-pill">
         <i class="bi bi-shield-lock"></i> Admin
@@ -55,17 +66,18 @@
 
                 <div class="card-body p-4">
 
+                    {{-- Flash message --}}
                     @if(session('success'))
                         <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
                             <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     @endif
 
                     @if(session('error'))
                         <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
                             <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ session('error') }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                         </div>
                     @endif
 
@@ -78,97 +90,153 @@
                             </ul>
                         </div>
                     @endif
+
                     <form action="{{ route('visit.store') }}" method="POST">
-                        @csrf 
-                        
+                        @csrf
+
+                        {{-- NIM / ID --}}
                         <div class="mb-3">
-                            <label for="visitor_name" class="form-label fw-semibold text-secondary">Nama Lengkap</label>
-                            <input type="text" class="form-control form-control-lg fs-6" id="visitor_name" name="visitor_name" value="{{ old('visitor_name') }}" required placeholder="Contoh: Budi Santoso">
+                            <label class="form-label fw-semibold">NIM / ID</label>
+                            <input type="text"
+                                   name="visitor_id"
+                                   class="form-control"
+                                   placeholder="Contoh: J0404241017"
+                                   value="{{ old('visitor_id') }}"
+                                   required>
                         </div>
 
+                        {{-- Keperluan --}}
                         <div class="mb-3">
-                            <label for="visitor_id" class="form-label fw-semibold text-secondary">NIM / ID</label>
-                            <input type="text" class="form-control form-control-lg fs-6" id="visitor_id" name="visitor_id" value="{{ old('visitor_id') }}" required placeholder="Contoh: J0404241017">
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="purpose" class="form-label fw-semibold text-secondary">Keperluan</label>
-                            <select class="form-select form-select-lg fs-6" id="purpose" name="purpose" required>
-                                <option value="" selected disabled>-- Pilih Keperluan --</option>
-                                <option value="belajar" {{ old('purpose') == 'belajar' ? 'selected' : '' }}>Hanya Belajar / Berkunjung</option>
-                                <option value="pinjam" {{ old('purpose') == 'pinjam' ? 'selected' : '' }}>Peminjaman Alat/Barang</option>
+                            <label class="form-label fw-semibold">Keperluan</label>
+                            <select name="purpose"
+                                    id="purposeSelect"
+                                    class="form-select"
+                                    required>
+                                <option value="">-- Pilih Keperluan --</option>
+                                <option value="belajar" {{ old('purpose') == 'belajar' ? 'selected' : '' }}>
+                                    Belajar Saja
+                                </option>
+                                <option value="pinjam" {{ old('purpose') == 'pinjam' ? 'selected' : '' }}>
+                                    Peminjaman Alat/Barang
+                                </option>
                             </select>
                         </div>
 
-                        <div id="borrowing-section" class="d-none bg-light p-3 rounded-3 border mb-4">
-                            <h6 class="text-primary fw-bold mb-3"><i class="bi bi-box-seam"></i> Detail Peminjaman</h6>
-                            
+                        {{-- DETAIL PEMINJAMAN --}}
+                        <div id="borrowDetailBox"
+                             class="border rounded-3 p-3 bg-light mb-3 d-none">
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="bi bi-box-seam text-primary me-2"></i>
+                                <span class="fw-semibold text-primary">Detail Peminjaman</span>
+                            </div>
+
+                            {{-- Pilih Barang --}}
                             <div class="mb-3">
-                                <label for="item_id" class="form-label small text-muted">Pilih Barang</label>
-                                <select class="form-select" id="item_id" name="item_id">
-                                    <option value="" selected>-- Pilih Barang --</option>
+                                <label class="form-label fw-semibold">Pilih Barang</label>
+                                <select name="item_id"
+                                        id="itemSelect"
+                                        class="form-select">
+                                    <option value="">-- Pilih Barang --</option>
                                     @foreach($items as $item)
-                                        <option value="{{ $item->id }}" {{ old('item_id') == $item->id ? 'selected' : '' }}>
+                                        <option value="{{ $item->id }}"
+                                                {{ old('item_id') == $item->id ? 'selected' : '' }}>
                                             {{ $item->name }} (Sisa Stok: {{ $item->current_stock }})
                                         </option>
                                     @endforeach
                                 </select>
                             </div>
 
+                            {{-- Jumlah Pinjam --}}
                             <div class="mb-3">
-                                <label for="quantity" class="form-label small text-muted">Jumlah Pinjam</label>
-                                <input type="number" class="form-control" id="quantity" name="quantity" min="1" placeholder="0" value="{{ old('quantity') }}">
+                                <label class="form-label fw-semibold">Jumlah Pinjam</label>
+                                <input type="number"
+                                       name="quantity"
+                                       id="quantityInput"
+                                       class="form-control"
+                                       min="1"
+                                       value="{{ old('quantity', 1) }}">
                             </div>
                         </div>
 
-                        <div class="d-grid gap-2 mt-4">
-                            <button type="submit" class="btn btn-primary btn-lg fw-bold shadow-sm">Tap In Masuk</button>
-                        </div>
+                        {{-- Tombol Submit --}}
+                        <button type="submit" class="btn btn-primary w-100 mt-2">
+                            Tap In Masuk
+                        </button>
 
-                        <div class="mt-4 text-center">
-                            <a href="{{ route('visit.tap-out') }}" class="text-danger fw-bold text-decoration-none">
-                                <i class="bi bi-box-arrow-right"></i> Klik disini untuk Tap Out
+                        <div class="text-center mt-3">
+                            <a href="{{ route('visit.tap-out') }}" class="text-danger fw-semibold text-decoration-none">
+                                <i class="bi bi-box-arrow-right me-1"></i> Klik disini untuk Tap Out
                             </a>
                         </div>
-
                     </form>
-                </div> </div> </div>
+
+                </div>
+            </div>
+
+        </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const purposeSelect = document.getElementById('purpose');
-        const borrowingSection = document.getElementById('borrowing-section');
-        const inputItem = document.getElementById('item_id');
-        const inputQty = document.getElementById('quantity');
+document.addEventListener('DOMContentLoaded', function () {
+    const purposeSelect  = document.getElementById('purposeSelect');
+    const detailBox      = document.getElementById('borrowDetailBox');
+    const itemSelect     = document.getElementById('itemSelect');
+    const quantityInput  = document.getElementById('quantityInput');
 
-        function toggleBorrowingSection() {
-            if (!purposeSelect || !borrowingSection) return;
+    function showDetailBox() {
+        // tampilkan dulu (hilangkan d-none)
+        detailBox.classList.remove('d-none');
 
-            if (purposeSelect.value === 'pinjam') {
-                borrowingSection.classList.remove('d-none');
-                if(inputItem) inputItem.setAttribute('required', 'required');
-                if(inputQty) inputQty.setAttribute('required', 'required');
-            } else {
-                borrowingSection.classList.add('d-none');
-                if(inputItem) inputItem.removeAttribute('required');
-                if(inputQty) inputQty.removeAttribute('required');
-                // Optional: Reset nilai jika disembunyikan
-                // if(inputItem) inputItem.value = "";
-                // if(inputQty) inputQty.value = "";
-            }
+        // paksa reflow supaya transisi jalan
+        void detailBox.offsetHeight;
+
+        // aktifkan animasi slide
+        detailBox.classList.add('active');
+
+        itemSelect.required    = true;
+        quantityInput.required = true;
+
+        // scroll pelan ke detail box
+        setTimeout(() => {
+            const y = detailBox.getBoundingClientRect().top + window.scrollY - 80;
+            window.scrollTo({
+                top: y,
+                behavior: 'smooth'
+            });
+        }, 250);
+    }
+
+    function hideDetailBox() {
+        detailBox.classList.remove('active');
+        itemSelect.required    = false;
+        quantityInput.required = false;
+
+        // setelah animasi selesai, baru disembunyikan total
+        setTimeout(() => {
+            detailBox.classList.add('d-none');
+        }, 400);
+    }
+
+    function toggleDetailBox() {
+        if (!purposeSelect) return;
+
+        if (purposeSelect.value === 'pinjam') {
+            showDetailBox();
+        } else {
+            hideDetailBox();
         }
+    }
 
-        if (purposeSelect) {
-            purposeSelect.addEventListener('change', toggleBorrowingSection);
-        }
+    if (purposeSelect) {
+        purposeSelect.addEventListener('change', toggleDetailBox);
+    }
 
-        // Jalankan saat load agar status old input terjaga
-        toggleBorrowingSection();
-    });
+    // Inisialisasi saat pertama load (untuk old() ketika validasi gagal)
+    toggleDetailBox();
+});
 </script>
 
 </body>

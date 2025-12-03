@@ -72,7 +72,7 @@
                             <label class="form-label fw-semibold text-secondary">NIM / ID Pengunjung</label>
                             <div class="input-group">
                                 <span class="input-group-text bg-light"><i class="bi bi-person-badge"></i></span>
-                                <input type="text" name="visitor_id" class="form-control form-control-lg fs-6" required placeholder="Contoh: 12345678">
+                                <input type="text" name="visitor_id" class="form-control form-control-lg fs-6" required placeholder="Contoh: J0404241017">
                             </div>
                         </div>
                         
