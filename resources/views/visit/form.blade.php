@@ -88,7 +88,7 @@
 
                         <div class="mb-3">
                             <label for="visitor_id" class="form-label fw-semibold text-secondary">NIM / ID</label>
-                            <input type="text" class="form-control form-control-lg fs-6" id="visitor_id" name="visitor_id" value="{{ old('visitor_id') }}" required placeholder="Contoh: 12345678">
+                            <input type="text" class="form-control form-control-lg fs-6" id="visitor_id" name="visitor_id" value="{{ old('visitor_id') }}" required placeholder="Contoh: J0404241017">
                         </div>
 
                         <div class="mb-3">

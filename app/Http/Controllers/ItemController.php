@@ -78,9 +78,9 @@ class ItemController extends Controller
     public function destroy(Item $item)
     {
         // Hapus file gambar dari penyimpanan jika ada
-        if ($item->image && Storage::disk('public')->exists($item->image)) {
-            Storage::disk('public')->delete($item->image);
-        }
+    if ($item->image && Storage::disk('public')->exists($item->image)) {
+        Storage::disk('public')->delete($item->image);
+    }
         
         // Hapus data dari database
         $item->delete();

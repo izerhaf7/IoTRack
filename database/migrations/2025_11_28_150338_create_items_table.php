@@ -17,6 +17,8 @@ return new class extends Migration
         $table->integer('total_stock'); // Stok awal (misal: 100)
         $table->integer('current_stock'); // Stok tersedia (misal: 95)
         $table->timestamps();
+        $table->softDeletes();
+
     });
 }
 
