@@ -23,6 +23,8 @@ class ItemController extends Controller
             'total_stock' => 'required|integer|min:1',
             // Validasi gambar: harus gambar (jpeg,png,jpg,gif) dan maks 2MB
             'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ], [
+            'current_stock.lte' => 'Gagal! Stok tersedia tidak boleh melebihi Total Aset',
         ]);
 
         // 1. Handle Upload Gambar
@@ -50,9 +52,11 @@ class ItemController extends Controller
             'name' => 'required',
             'description' => 'required',
             'total_stock' => 'required|integer|min:1',
-            'current_stock' => 'required|integer',
+            'current_stock' => 'required|integer|lte:total_stock',
             // Gambar di sini 'nullable' (boleh kosong jika tidak ingin ganti gambar)
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ], [
+            'current_stock.lte' => 'Gagal! Stok tersedia tidak boleh melebihi Total Aset',
         ]);
 
         $dataToUpdate = $request->only([
