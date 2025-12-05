@@ -349,10 +349,18 @@
             margin: 0;
         }
 
+        [data-theme="dark"] .page-info h1 {
+            color: #f1f5f9;
+        }
+
         .page-info .breadcrumb {
             font-size: 0.75rem;
             color: var(--text-muted);
             margin: 0;
+        }
+
+        [data-theme="dark"] .page-info .breadcrumb {
+            color: #94a3b8;
         }
 
         .topbar-right { display: flex; align-items: center; gap: 0.75rem; }
@@ -525,6 +533,12 @@
         [data-theme="dark"] .modal-header { color: var(--text-primary); }
         [data-theme="dark"] .list-group-item { background: transparent; color: var(--text-primary); }
         [data-theme="dark"] code { background: var(--bg-hover); color: var(--primary); }
+        [data-theme="dark"] .card-title { color: #f1f5f9; }
+        [data-theme="dark"] .card-header h6 { color: #f1f5f9; }
+        [data-theme="dark"] .stat-value { color: #f1f5f9; }
+        [data-theme="dark"] .activity-name { color: #f1f5f9; }
+        [data-theme="dark"] .menu-title { color: #f1f5f9; }
+        [data-theme="dark"] .quick-action-text h6 { color: #f1f5f9; }
 
         /* ========== BADGES ========== */
         .badge {
@@ -692,10 +706,6 @@
                 <button type="button" class="topbar-btn theme-toggle" id="themeToggle" title="Toggle Theme">
                     <i class="bi bi-moon-fill"></i>
                     <i class="bi bi-sun-fill"></i>
-                </button>
-                <button type="button" class="topbar-btn" title="Notifications">
-                    <i class="bi bi-bell"></i>
-                    @if($activeBorrowCount > 0)<span class="badge-dot"></span>@endif
                 </button>
             </div>
         </header>

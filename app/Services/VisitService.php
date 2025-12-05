@@ -44,9 +44,14 @@ class VisitService
      * 
      * Alur proses:
      * 1. Validasi NIM mahasiswa terdaftar di database
-     * 2. Jika tujuan adalah meminjam, validasi ketersediaan stok
-     * 3. Buat record kunjungan dengan tapped_out_at = null (Requirement 2.1)
-     * 4. Jika meminjam, buat record peminjaman dan kurangi stok
+     * 2. Jika tujuan belajar, cek tidak ada tap in belajar yang belum tap out
+     * 3. Jika tujuan meminjam, validasi ketersediaan stok
+     * 4. Buat record kunjungan dengan tapped_out_at = null
+     * 5. Jika meminjam, buat record peminjaman dan kurangi stok
+     * 
+     * Catatan:
+     * - Tap in belajar: Hanya boleh 1x, tidak boleh menumpuk
+     * - Tap in meminjam: Boleh berkali-kali
      * 
      * Semua operasi dilakukan dalam satu transaction untuk menjamin atomicity.
      *
@@ -58,6 +63,7 @@ class VisitService
      * @return Visit Instance kunjungan yang berhasil dibuat
      * @throws ValidationException Jika:
      *                             - NIM tidak terdaftar di database mahasiswa
+     *                             - Sudah ada tap in belajar yang belum tap out
      *                             - Barang tidak ditemukan
      *                             - Stok barang tidak mencukupi
      */
@@ -70,6 +76,20 @@ class VisitService
             throw ValidationException::withMessages([
                 'visitor_id' => 'NIM tidak terdaftar di data mahasiswa.'
             ]);
+        }
+
+        // Validasi: Jika tujuan belajar, tidak boleh ada tap in belajar yang belum tap out
+        if ($data['purpose'] === 'belajar') {
+            $existingBelajar = Visit::where('visitor_id', $data['visitor_id'])
+                ->where('purpose', 'belajar')
+                ->whereNull('tapped_out_at')
+                ->exists();
+
+            if ($existingBelajar) {
+                throw ValidationException::withMessages([
+                    'purpose' => 'Anda sudah memiliki kunjungan belajar yang belum Tap Out. Silakan Tap Out terlebih dahulu.'
+                ]);
+            }
         }
 
         // Validasi stok jika tujuan adalah meminjam
@@ -89,9 +109,9 @@ class VisitService
             }
         }
 
-        // Simpan visit + borrowing dalam satu transaction (Requirement 12.2)
+        // Simpan visit + borrowing dalam satu transaction
         return DB::transaction(function () use ($data, $student) {
-            // Buat kunjungan baru dengan tapped_out_at = null (Requirement 2.1)
+            // Buat kunjungan baru dengan tapped_out_at = null
             $visit = Visit::create([
                 'visitor_name' => $student->name,
                 'visitor_id'   => $student->nim,
@@ -113,24 +133,22 @@ class VisitService
     }
 
     /**
-     * Proses Tap Out - validasi dan kembalikan semua peminjaman aktif.
+     * Proses Tap Out - tap out SEMUA kunjungan yang belum tap out dan kembalikan SEMUA peminjaman.
      * 
      * Alur proses:
-     * 1. Validasi apakah Tap Out diizinkan (ada peminjaman aktif, belum tap out)
-     * 2. Kembalikan semua peminjaman aktif melalui BorrowingService
-     * 3. Catat waktu tap out pada record kunjungan (Requirement 2.2)
+     * 1. Validasi apakah ada kunjungan yang belum tap out
+     * 2. Ambil SEMUA kunjungan yang belum tap out untuk NIM tersebut
+     * 3. Kembalikan SEMUA peminjaman aktif dari semua kunjungan
+     * 4. Catat waktu tap out pada SEMUA record kunjungan
      * 
-     * Validasi yang dilakukan:
-     * - Requirement 1.1, 1.3: Harus ada peminjaman aktif
-     * - Requirement 2.3: Belum pernah tap out sebelumnya
+     * Catatan: Sekali tap out, semua log kunjungan dan peminjaman akan selesai.
      * 
-     * Semua operasi dilakukan dalam satu transaction (Requirement 2.5).
+     * Semua operasi dilakukan dalam satu transaction.
      *
      * @param string $nim NIM mahasiswa yang akan tap out
-     * @return Visit Instance kunjungan yang berhasil di-tap out
+     * @return Visit Instance kunjungan terbaru yang berhasil di-tap out
      * @throws ValidationException Jika:
-     *                             - Tidak ada peminjaman aktif (Requirement 1.1)
-     *                             - Kunjungan sudah di-tap out sebelumnya (Requirement 2.3)
+     *                             - Tidak ada kunjungan yang belum tap out
      *                             - Data kunjungan tidak ditemukan
      */
     public function tapOut(string $nim): Visit
@@ -144,20 +162,27 @@ class VisitService
             ]);
         }
 
-        // Ambil kunjungan yang eligible untuk tap out
-        $visit = $validation['visit'];
+        // Ambil SEMUA kunjungan yang belum tap out
+        $visits = $validation['visits'];
 
-        // Proses tap out dalam transaction (Requirement 2.5)
-        return DB::transaction(function () use ($visit) {
-            // Kembalikan semua peminjaman aktif
-            $this->borrowingService->returnAllForVisit($visit);
+        // Proses tap out dalam transaction
+        return DB::transaction(function () use ($visits) {
+            $now = now();
+            $latestVisit = null;
 
-            // Catat waktu tap out (Requirement 2.2)
-            $visit->update([
-                'tapped_out_at' => now()
-            ]);
+            foreach ($visits as $visit) {
+                // Kembalikan semua peminjaman aktif untuk kunjungan ini
+                $this->borrowingService->returnAllForVisit($visit);
 
-            return $visit->fresh();
+                // Catat waktu tap out
+                $visit->update([
+                    'tapped_out_at' => $now
+                ]);
+
+                $latestVisit = $visit;
+            }
+
+            return $latestVisit->fresh();
         });
     }
 
@@ -166,78 +191,49 @@ class VisitService
      * 
      * Kriteria validasi:
      * 1. Harus ada data kunjungan untuk NIM tersebut
-     * 2. Harus ada peminjaman aktif (status = 'dipinjam') - Requirement 1.1, 1.3
-     * 3. Kunjungan belum pernah di-tap out (tapped_out_at = null) - Requirement 2.3
+     * 2. Harus ada kunjungan yang belum tap out (tapped_out_at = null)
      *
      * @param string $nim NIM mahasiswa
      * @return array Hasil validasi dengan format:
      *               - allowed: bool - apakah tap out diizinkan
      *               - message: string - pesan error jika tidak diizinkan
-     *               - visit: Visit|null - instance kunjungan yang eligible
+     *               - visits: Collection|null - semua kunjungan yang belum tap out
      */
     public function validateTapOut(string $nim): array
     {
-        // Cari semua kunjungan berdasarkan NIM dengan eager loading peminjaman aktif
+        // Cari SEMUA kunjungan yang belum tap out berdasarkan NIM
         $visits = Visit::where('visitor_id', $nim)
+            ->whereNull('tapped_out_at')
             ->with(['borrowings' => function ($query) {
                 $query->where('status', 'dipinjam');
             }])
+            ->orderBy('created_at', 'desc')
             ->get();
 
-        // Validasi: data kunjungan harus ada
+        // Validasi: harus ada kunjungan yang belum tap out
         if ($visits->isEmpty()) {
-            return [
-                'allowed' => false,
-                'message' => 'Data kunjungan tidak ditemukan untuk NIM tersebut.',
-                'visit' => null
-            ];
-        }
-
-        // Cari kunjungan yang eligible untuk tap out
-        $eligibleVisit = null;
-        $hasActiveBorrowings = false;
-        $alreadyTappedOut = false;
-
-        foreach ($visits as $visit) {
-            // Cek apakah ada peminjaman aktif
-            $activeBorrowings = $visit->borrowings->where('status', 'dipinjam');
+            // Cek apakah ada data kunjungan sama sekali
+            $hasAnyVisit = Visit::where('visitor_id', $nim)->exists();
             
-            if ($activeBorrowings->isNotEmpty()) {
-                $hasActiveBorrowings = true;
-                
-                // Cek apakah sudah tap out (Requirement 2.3)
-                if ($visit->tapped_out_at !== null) {
-                    $alreadyTappedOut = true;
-                } else {
-                    // Kunjungan ini eligible untuk tap out
-                    $eligibleVisit = $visit;
-                    break;
-                }
+            if (!$hasAnyVisit) {
+                return [
+                    'allowed' => false,
+                    'message' => 'Data kunjungan tidak ditemukan untuk NIM tersebut.',
+                    'visits' => null
+                ];
             }
-        }
-
-        // Validasi: harus ada peminjaman aktif (Requirement 1.1, 1.3)
-        if (!$hasActiveBorrowings) {
+            
             return [
                 'allowed' => false,
-                'message' => 'Anda tidak memiliki peminjaman aktif untuk dikembalikan, Tap Out tidak diizinkan.',
-                'visit' => null
-            ];
-        }
-
-        // Validasi: belum pernah tap out (Requirement 2.3, 2.4)
-        if ($alreadyTappedOut && $eligibleVisit === null) {
-            return [
-                'allowed' => false,
-                'message' => 'Kunjungan ini sudah di-checkout. Tap Out berulang tidak diizinkan.',
-                'visit' => null
+                'message' => 'Semua kunjungan Anda sudah di-checkout. Silakan Tap In terlebih dahulu.',
+                'visits' => null
             ];
         }
 
         return [
             'allowed' => true,
             'message' => 'Tap Out diizinkan.',
-            'visit' => $eligibleVisit
+            'visits' => $visits
         ];
     }
 }

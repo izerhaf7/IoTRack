@@ -7,44 +7,56 @@
 <style>
     .hero-section {
         text-align: center;
-        padding: 3rem 1rem 4rem;
+        padding: 1rem 1rem 2.5rem;
+        margin-bottom: 2.5rem;
         position: relative;
     }
 
     .hero-icon {
-        width: 100px;
-        height: 100px;
+        width: 90px;
+        height: 90px;
         background: var(--gradient-primary);
-        border-radius: 28px;
+        border-radius: 24px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 2rem;
-        font-size: 2.5rem;
+        margin: 0 auto 1.5rem;
+        font-size: 2.25rem;
         color: #fff;
-        box-shadow: 0 20px 40px rgba(99, 102, 241, 0.3);
+        box-shadow: 0 15px 35px rgba(99, 102, 241, 0.3);
         animation: float 3s ease-in-out infinite;
     }
 
     @keyframes float {
         0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
+        50% { transform: translateY(-8px); }
     }
 
     .hero-title {
-        font-size: 2.5rem;
+        font-size: 2.25rem;
         font-weight: 800;
         color: var(--text-primary);
         margin-bottom: 0.75rem;
         text-align: center;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    [data-theme="dark"] .hero-title {
+        color: #fff;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
 
     .hero-subtitle {
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         color: var(--text-secondary);
         max-width: 500px;
         margin: 0 auto;
         text-align: center;
+        line-height: 1.6;
+    }
+
+    [data-theme="dark"] .hero-subtitle {
+        color: #94a3b8;
     }
 
     .menu-grid {

@@ -6,7 +6,7 @@
 @section('styles')
 <style>
     .welcome-banner {
-        background: var(--gradient-primary);
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
         border-radius: var(--radius-xl);
         padding: 2rem 2.5rem;
         margin-bottom: 2rem;
@@ -37,8 +37,8 @@
     }
 
     .welcome-content { position: relative; z-index: 1; }
-    .welcome-content h2 { color: #fff; font-weight: 800; font-size: 1.75rem; margin-bottom: 0.5rem; }
-    .welcome-content p { color: rgba(255,255,255,0.8); margin: 0; font-size: 0.95rem; }
+    .welcome-content h2 { color: #fff; font-weight: 800; font-size: 1.75rem; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .welcome-content p { color: #fff; margin: 0; font-size: 0.95rem; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
 
     .welcome-stats {
         display: flex;
@@ -54,8 +54,8 @@
         backdrop-filter: blur(10px);
     }
 
-    .welcome-stat-value { font-size: 2rem; font-weight: 800; color: #fff; line-height: 1; }
-    .welcome-stat-label { font-size: 0.75rem; color: rgba(255,255,255,0.8); margin-top: 0.25rem; }
+    .welcome-stat-value { font-size: 2rem; font-weight: 800; color: #fff; line-height: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .welcome-stat-label { font-size: 0.75rem; color: #fff; margin-top: 0.25rem; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
 
     .stats-grid {
         display: grid;
