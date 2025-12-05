@@ -306,43 +306,6 @@
     </div>
 </div>
 
-{{-- Charts Row --}}
-<div class="row g-4 mb-4">
-    <div class="col-lg-8">
-        <div class="card chart-card">
-            <div class="card-header">
-                <h6 class="card-title"><i class="bi bi-graph-up"></i> Statistik Pengunjung</h6>
-                <span class="badge badge-primary">7 Hari Terakhir</span>
-            </div>
-            <div class="card-body">
-                <div class="chart-container">
-                    <canvas id="visitorsChart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-4">
-        <div class="card chart-card">
-            <div class="card-header">
-                <h6 class="card-title"><i class="bi bi-pie-chart-fill"></i> Tujuan Kunjungan</h6>
-            </div>
-            <div class="card-body">
-                @if(isset($purposeDistribution) && ($purposeDistribution['belajar'] > 0 || $purposeDistribution['pinjam'] > 0))
-                <div class="chart-container">
-                    <canvas id="purposeChart"></canvas>
-                </div>
-                @else
-                <div class="empty-state">
-                    <div class="empty-state-icon"><i class="bi bi-pie-chart"></i></div>
-                    <h6>Belum Ada Data</h6>
-                    <p>Data akan muncul setelah ada kunjungan</p>
-                </div>
-                @endif
-            </div>
-        </div>
-    </div>
-</div>
-
 {{-- Activity Row --}}
 <div class="row g-4">
     <div class="col-lg-6">
@@ -436,58 +399,9 @@ document.addEventListener('DOMContentLoaded', function() {
     Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
     Chart.defaults.color = textColor;
     
-    @if(isset($dailyVisitorCounts))
-    new Chart(document.getElementById('visitorsChart'), {
-        type: 'line',
-        data: {
-            labels: {!! json_encode($dailyVisitorCounts->pluck('date')->map(fn($d) => \Carbon\Carbon::parse($d)->format('d M'))) !!},
-            datasets: [{
-                label: 'Pengunjung',
-                data: {!! json_encode($dailyVisitorCounts->pluck('visitor_count')) !!},
-                fill: true,
-                backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                borderColor: '#6366f1',
-                borderWidth: 3,
-                tension: 0.4,
-                pointBackgroundColor: '#6366f1',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointRadius: 5,
-                pointHoverRadius: 7
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: gridColor } },
-                x: { grid: { display: false } }
-            }
-        }
-    });
-    @endif
 
-    @if(isset($purposeDistribution) && ($purposeDistribution['belajar'] > 0 || $purposeDistribution['pinjam'] > 0))
-    new Chart(document.getElementById('purposeChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Belajar', 'Meminjam'],
-            datasets: [{
-                data: [{{ $purposeDistribution['belajar'] }}, {{ $purposeDistribution['pinjam'] }}],
-                backgroundColor: ['#06b6d4', '#f59e0b'],
-                borderWidth: 0,
-                hoverOffset: 10
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } } },
-            cutout: '65%'
-        }
-    });
-    @endif
+
+
 });
 </script>
 @endsection

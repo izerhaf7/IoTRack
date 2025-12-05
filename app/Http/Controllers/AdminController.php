@@ -56,17 +56,13 @@ class AdminController extends Controller
         $uniqueVisitorsCount = $todayStats['unique_visitors'];
 
         $mostBorrowedItems = $this->analyticsService->getMostBorrowedItems(7);
-        $dailyVisitorCounts = $this->analyticsService->getDailyVisitorCounts(7);
-        $purposeDistribution = $this->analyticsService->getPurposeDistribution(7);
 
         return view('admin.dashboard', compact(
             'activeBorrowings',
             'todaysVisits',
             'uniqueVisitorsCount',
             'activityFilter',
-            'mostBorrowedItems',
-            'dailyVisitorCounts',
-            'purposeDistribution'
+            'mostBorrowedItems'
         ));
     }
 
