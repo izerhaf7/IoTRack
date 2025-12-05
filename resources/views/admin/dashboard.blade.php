@@ -1,375 +1,493 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Admin - Lab IoT</title>
-    <link rel="icon" type="image/png" href="{{ asset('images/IoTrackLogo.png') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    
-    <style>
-        .navbar-custom { background-color: #343a40; }
-        
-        .stat-card {
-            border: none;
-            border-radius: 10px;
-            transition: transform 0.2s;
-        }
-        .stat-card:hover { transform: translateY(-5px); }
+@extends('admin.layouts.app')
 
-        .icon-box {
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 10px;
-            font-size: 1.5rem;
-        }
+@section('title', 'Dashboard')
+@section('page-title', 'Dashboard')
 
-        .table-card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            overflow: hidden;
-        }
-        .table thead th {
-            background-color: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
-            font-weight: 600;
-            color: #495057;
-            text-transform: uppercase;
-            font-size: 0.85rem;
-        }
-    </style>
-</head>
-<body class="bg-light">
+@section('styles')
+<style>
+    .welcome-banner {
+        background: var(--gradient-primary);
+        border-radius: var(--radius-xl);
+        padding: 2rem 2.5rem;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
 
-<nav class="navbar navbar-dark navbar-custom shadow-sm sticky-top">
-    <div class="container">
-        <span class="navbar-brand mb-0 h1 fw-bold">
-            <i class="bi bi-speedometer2"></i> Dashboard Monitoring
-        </span>
-        
-        <a href="{{ route('admin.menu') }}" class="btn btn-outline-light btn-sm">
-            <i class="bi bi-arrow-left"></i> Kembali ke Menu
-        </a>
-    </div>
-</nav>
+    .welcome-banner::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 70%);
+        border-radius: 50%;
+    }
 
-<div class="container py-4">
+    .welcome-banner::after {
+        content: '';
+        position: absolute;
+        bottom: -30%;
+        left: 10%;
+        width: 200px;
+        height: 200px;
+        background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+        border-radius: 50%;
+    }
 
-    <div class="row mb-4">
-        <div class="col-12 mb-4">
-            <div class="p-4 bg-white rounded shadow-sm border d-flex justify-content-between align-items-center">
-                <div>
-                    <h4 class="fw-bold text-dark mb-1">Halo, Admin! 👋</h4>
-                    <p class="text-muted mb-0">Berikut adalah ringkasan aktivitas Lab IoT hari ini.</p>
-                </div>
-                <div class="text-end d-none d-md-block">
-                    <small class="text-muted d-block">Tanggal Hari Ini</small>
-                    <span class="fw-bold fs-5">{{ now()->isoFormat('dddd, D MMMM Y') }}</span>
-                </div>
+    .welcome-content { position: relative; z-index: 1; }
+    .welcome-content h2 { color: #fff; font-weight: 800; font-size: 1.75rem; margin-bottom: 0.5rem; }
+    .welcome-content p { color: rgba(255,255,255,0.8); margin: 0; font-size: 0.95rem; }
+
+    .welcome-stats {
+        display: flex;
+        gap: 2rem;
+        margin-top: 1.5rem;
+    }
+
+    .welcome-stat {
+        text-align: center;
+        padding: 1rem 1.5rem;
+        background: rgba(255,255,255,0.15);
+        border-radius: var(--radius-md);
+        backdrop-filter: blur(10px);
+    }
+
+    .welcome-stat-value { font-size: 2rem; font-weight: 800; color: #fff; line-height: 1; }
+    .welcome-stat-label { font-size: 0.75rem; color: rgba(255,255,255,0.8); margin-top: 0.25rem; }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        padding: 1.5rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 100px;
+        height: 100px;
+        background: var(--stat-color);
+        opacity: 0.1;
+        border-radius: 50%;
+        transform: translate(30%, -30%);
+    }
+
+    .stat-card.primary { --stat-color: var(--primary); }
+    .stat-card.success { --stat-color: var(--success); }
+    .stat-card.warning { --stat-color: var(--warning); }
+    .stat-card.info { --stat-color: var(--info); }
+
+    .stat-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .stat-card.primary .stat-icon { background: rgba(99, 102, 241, 0.15); color: var(--primary); }
+    .stat-card.success .stat-icon { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+    .stat-card.warning .stat-icon { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .stat-card.info .stat-icon { background: rgba(6, 182, 212, 0.15); color: var(--info); }
+
+    .stat-value { font-size: 2rem; font-weight: 800; color: var(--text-primary); line-height: 1; }
+    .stat-label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; font-weight: 500; }
+
+    .stat-trend {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-top: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 2rem;
+    }
+
+    .stat-trend.up { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+    .stat-trend.down { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+
+    .chart-card { height: 100%; }
+    .chart-card .card-header { display: flex; align-items: center; justify-content: space-between; }
+    .chart-card .card-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+    .chart-card .card-title i { color: var(--primary); }
+    .chart-container { position: relative; height: 280px; }
+
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .quick-action {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem 1.5rem;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        text-decoration: none;
+        transition: var(--transition);
+    }
+
+    .quick-action:hover {
+        border-color: var(--primary);
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .quick-action-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .quick-action.inventory .quick-action-icon { background: var(--gradient-primary); color: #fff; }
+    .quick-action.borrowing .quick-action-icon { background: var(--gradient-warning); color: #fff; }
+    .quick-action.visits .quick-action-icon { background: var(--gradient-success); color: #fff; }
+
+    .quick-action-text h6 { font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem; font-size: 0.95rem; }
+    .quick-action-text p { font-size: 0.75rem; color: var(--text-muted); margin: 0; }
+
+    .activity-card .card-header { display: flex; align-items: center; justify-content: space-between; }
+    .activity-card .card-title { font-weight: 700; font-size: 1rem; color: var(--text-primary); margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+
+    .activity-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    .activity-item:last-child { border-bottom: none; }
+
+    .activity-avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: #fff;
+        flex-shrink: 0;
+    }
+
+    .activity-avatar.belajar { background: var(--gradient-info); }
+    .activity-avatar.pinjam { background: var(--gradient-warning); }
+
+    .activity-info { flex: 1; min-width: 0; }
+    .activity-name { font-weight: 600; color: var(--text-primary); font-size: 0.9rem; }
+    .activity-detail { font-size: 0.75rem; color: var(--text-muted); }
+    .activity-time { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; white-space: nowrap; }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+    }
+
+    .empty-state-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: var(--bg-hover);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 1.75rem;
+        color: var(--text-muted);
+    }
+
+    .empty-state h6 { color: var(--text-primary); font-weight: 600; margin-bottom: 0.25rem; }
+    .empty-state p { color: var(--text-muted); font-size: 0.85rem; margin: 0; }
+
+    @media (max-width: 1200px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 768px) {
+        .stats-grid { grid-template-columns: 1fr; }
+        .quick-actions { grid-template-columns: 1fr; }
+        .welcome-stats { flex-direction: column; gap: 1rem; }
+    }
+</style>
+@endsection
+
+@section('content')
+{{-- Welcome Banner --}}
+<div class="welcome-banner">
+    <div class="welcome-content">
+        <h2>Selamat Datang Kembali! 👋</h2>
+        <p>Berikut ringkasan aktivitas Lab IoT hari ini</p>
+        <div class="welcome-stats">
+            <div class="welcome-stat">
+                <div class="welcome-stat-value">{{ $uniqueVisitorsCount ?? 0 }}</div>
+                <div class="welcome-stat-label">Pengunjung</div>
+            </div>
+            <div class="welcome-stat">
+                <div class="welcome-stat-value">{{ $activeBorrowings->count() }}</div>
+                <div class="welcome-stat-label">Peminjaman Aktif</div>
+            </div>
+            <div class="welcome-stat">
+                <div class="welcome-stat-value">{{ $todaysVisits->count() }}</div>
+                <div class="welcome-stat-label">Total Kunjungan</div>
             </div>
         </div>
-
-        <div class="col-md-6 col-xl-3 mb-3">
-            <div class="card stat-card shadow-sm h-100">
-                <div class="card-body d-flex align-items-center">
-                    <div class="icon-box bg-warning bg-opacity-10 text-warning me-3">
-                        <i class="bi bi-hourglass-split"></i>
-                    </div>
-                    <div>
-                        <h6 class="text-muted mb-0 small text-uppercase fw-bold">Sedang Dipinjam</h6>
-                        <h3 class="fw-bold mb-0 text-dark">{{ $activeBorrowings->count() }} <small class="fs-6 text-muted">Item</small></h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6 col-xl-3 mb-3">
-            <div class="card stat-card shadow-sm h-100">
-                <div class="card-body d-flex align-items-center">
-                    <div class="icon-box bg-success bg-opacity-10 text-success me-3">
-                        <i class="bi bi-people-fill"></i>
-                    </div>
-                    <div>
-                        <h6 class="text-muted mb-0 small text-uppercase fw-bold">Pengunjung Hari Ini</h6>
-                        <h3 class="fw-bold mb-0 text-dark">{{ $uniqueVisitorsCount ?? $todaysVisits->count() }} <small class="fs-6 text-muted">Orang</small></h3>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    @endif
-    
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="bi bi-exclamation-triangle-fill me-2"></i> {{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    @endif
-    <div class="row g-4">
-        
-        {{-- BARANG BELUM DIKEMBALIKAN --}}
-        <div class="col-lg-12">
-            <div class="card table-card">
-                <div class="card-header bg-white py-3 d-flex align-items-center border-bottom">
-                    <i class="bi bi-exclamation-triangle-fill text-warning me-2 fs-5"></i>
-                    <h6 class="m-0 fw-bold text-dark">Barang Belum Dikembalikan</h6>
-                </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th class="ps-4">Nama Peminjam</th>
-                                    <th>Barang</th>
-                                    <th>Qty</th>
-                                    <th>Waktu Pinjam</th>
-                                    <th class="text-center">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($activeBorrowings as $borrow)
-                                <tr>
-                                    <td class="ps-4">
-                                        <div class="fw-bold text-dark">{{ $borrow->visit->visitor_name }}</div>
-                                        <small class="text-muted">{{ $borrow->visit->visitor_id }}</small>
-                                    </td>
-                                    <td>
-                                        @if($borrow->item)
-                                            <span class="text-primary fw-semibold">{{ $borrow->item->name }}</span>
-                                        @else
-                                            <span class="text-danger fw-semibold">[Item hilang]</span>
-                                        @endif
-                                    </td>
-                                    <td><span class="badge bg-secondary rounded-pill">{{ $borrow->quantity }} Unit</span></td>
-                                    <td>
-                                        <i class="bi bi-clock text-muted"></i> {{ $borrow->created_at->format('H:i') }}
-                                        <small class="text-muted d-block">{{ $borrow->created_at->diffForHumans() }}</small>
-                                    </td>
-                                    <td class="text-center">
-                                        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm" 
-                                                data-bs-toggle="modal" data-bs-target="#returnModal{{ $borrow->id }}">
-                                            <i class="bi bi-box-arrow-in-down me-1"></i> Terima
-                                        </button>
-                                    </td>
-                                </tr>
-
-                                <div class="modal fade" id="returnModal{{ $borrow->id }}" tabindex="-1">
-                                    <div class="modal-dialog modal-dialog-centered">
-                                        <div class="modal-content border-0 shadow-lg">
-                                            <div class="modal-header bg-primary text-white">
-                                                <h5 class="modal-title"><i class="bi bi-box-seam me-2"></i> Konfirmasi Pengembalian</h5>
-                                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body text-center p-4">
-                                                <div class="mb-3">
-                                                    <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
-                                                        <i class="bi bi-check-lg display-4"></i>
-                                                    </div>
-                                                </div>
-                                                <h5 class="fw-bold mb-3">Terima Barang Kembali?</h5>
-                                                <p class="text-muted mb-0">
-                                                    Anda akan menerima <strong>{{ $borrow->quantity }} unit {{ $borrow->item->name }}</strong> 
-                                                    dari <strong>{{ $borrow->visit->visitor_name }}</strong>.
-                                                </p>
-                                            </div>
-                                            <div class="modal-footer bg-light justify-content-center border-0 pb-4">
-                                                <button type="button" class="btn btn-light px-4 fw-bold" data-bs-dismiss="modal">Batal</button>
-                                                <form action="{{ route('admin.return', $borrow->id) }}" method="POST">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-primary px-4 fw-bold shadow-sm">
-                                                        <i class="bi bi-box-arrow-in-down me-2"></i> Ya, Terima Barang
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                @empty
-                                <tr>
-                                    <td colspan="5" class="text-center py-5 text-muted">
-                                        <i class="bi bi-check-circle display-4 d-block mb-3 text-success opacity-50"></i>
-                                        Tidak ada barang yang sedang dipinjam saat ini.
-                                    </td>
-                                </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        {{-- RIWAYAT KUNJUNGAN HARI INI --}}
-        <div class="col-lg-12">
-            <div class="card table-card">
-                <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center border-bottom">
-                    <div class="d-flex align-items-center mb-2 mb-sm-0">
-                        <i class="bi bi-journal-text text-primary me-2 fs-5"></i>
-                        <h6 class="m-0 fw-bold text-dark">Riwayat Kunjungan Hari Ini</h6>
-                    </div>
-
-                    {{-- FILTER AKTIVITAS --}}
-                    <form method="GET" action="{{ route('admin.dashboard') }}" class="d-flex align-items-center gap-2">
-                        <span class="small text-muted">Filter aktivitas:</span>
-                        @php $activityFilter = $activityFilter ?? request('activity'); @endphp
-                        <select name="activity" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
-                            <option value="" {{ $activityFilter == null ? 'selected' : '' }}>Semua</option>
-                            <option value="meminjam" {{ $activityFilter === 'meminjam' ? 'selected' : '' }}>Meminjam</option>
-                            <option value="belajar" {{ $activityFilter === 'belajar' ? 'selected' : '' }}>Belajar saja</option>
-                        </select>
-                    </form>
-                </div>
-
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th class="ps-4" style="width: 12%;">Jam Masuk</th>
-                                    <th style="width: 22%;">Nama</th>
-                                    <th style="width: 18%;">NIM</th>
-                                    <th>Aktivitas</th>
-                                    <th style="width: 18%;">Status Peminjaman</th>
-                                    <th class="text-center" style="width: 8%;">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($todaysVisits as $visit)
-                                <tr>
-                                    {{-- JAM --}}
-                                    <td class="ps-4 fw-bold text-secondary">{{ $visit->created_at->format('H:i') }} WIB</td>
-
-                                    {{-- NAMA --}}
-                                    <td class="fw-semibold">{{ $visit->visitor_name }}</td>
-
-                                    {{-- NIM --}}
-                                    <td class="text-muted font-monospace">{{ $visit->visitor_id }}</td>
-
-                                    {{-- AKTIVITAS DETAIL --}}
-                                    <td>
-                                        @if($visit->purpose === 'belajar')
-                                            <span class="badge bg-info bg-opacity-10 text-info border border-info rounded-pill px-3">
-                                                <i class="bi bi-book me-1"></i> Belajar Saja
-                                            </span>
-                                        @elseif($visit->purpose === 'pinjam')
-                                            @php
-                                                // asumsi relasi: $visit->borrowings (hasMany)
-                                                $borrowedItems = $visit->borrowings->map(function ($b) {
-                                                    $itemName = optional($b->item)->name ?? 'Item Dihapus';
-                                                    return $itemName.' ('.$b->quantity.'x)';
-                                                })->implode(', ');
-                                            @endphp
-
-                                            <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-3 text-start text-wrap" style="line-height: 1.4;">
-                                                <i class="bi bi-tools me-1"></i>
-                                                Pinjam: {{ $borrowedItems ?: 'Belum ada data peminjaman' }}
-                                            </span>
-                                        @endif
-                                    </td>
-
-                                    {{-- STATUS PEMINJAMAN --}}
-                                    <td>
-                                        @if($visit->purpose === 'belajar')
-                                            <span class="text-muted">-</span>
-                                        @else
-                                            @php
-                                                $hasActiveBorrowing = $visit->borrowings->contains('status', 'dipinjam');
-                                            @endphp
-
-                                            @if($hasActiveBorrowing)
-                                                <span class="badge bg-warning text-dark rounded-pill">
-                                                    Sedang dipinjam
-                                                </span>
-                                            @else
-                                                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill">
-                                                    Selesai / Dikembalikan
-                                                </span>
-                                            @endif
-                                        @endif
-                                    </td>
-
-                                    {{-- AKSI --}}
-                                    <td class="text-center">
-                                        <button type="button" class="btn btn-link text-danger p-0" 
-                                                data-bs-toggle="modal" data-bs-target="#deleteVisitModal{{ $visit->id }}" 
-                                                title="Hapus Riwayat">
-                                            <i class="bi bi-trash fs-5"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-
-                                {{-- MODAL HAPUS --}}
-                                <div class="modal fade" id="deleteVisitModal{{ $visit->id }}" tabindex="-1" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered">
-                                        <div class="modal-content border-0 shadow-lg">
-                                            
-                                            <div class="modal-header bg-danger text-white">
-                                            <h5 class="modal-title">
-                                                <i class="bi bi-exclamation-triangle-fill me-2"></i> Hapus Riwayat?
-                                            </h5>
-                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                            </div>
-
-                                            <div class="modal-body text-center p-4">
-                                                <div class="mb-3">
-                                                    <div class="bg-danger bg-opacity-10 text-danger rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
-                                                        <i class="bi bi-trash3-fill display-4"></i>
-                                                    </div>
-                                                </div>
-                                                
-                                                <h5 class="fw-bold mb-3">Konfirmasi Penghapusan</h5>
-                                                
-                                                <p class="text-muted mb-0">
-                                                    Anda akan menghapus riwayat kunjungan dari: <br>
-                                                    <strong>{{ $visit->visitor_name }}</strong> ({{ $visit->created_at->format('H:i') }} WIB).
-                                                    <br><small class="text-danger">Tindakan ini tidak dapat dibatalkan.</small>
-                                                </p>
-                                            </div>
-
-                                            <div class="modal-footer bg-light justify-content-center border-0 pb-4">
-                                                <button type="button" class="btn btn-light px-4 fw-bold" data-bs-dismiss="modal">Batal</button>
-                                                
-                                                <form action="{{ route('admin.visit.destroy', $visit->id) }}" method="POST">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-danger px-4 fw-bold shadow-sm">
-                                                        <i class="bi bi-trash-fill me-2"></i> Ya, Hapus
-                                                    </button>
-                                                </form>
-                                            </div>
-
-                                        </div>
-                                    </div>
-                                </div>
-                                @empty
-                                <tr>
-                                    <td colspan="6" class="text-center py-5 text-muted">
-                                        Belum ada pengunjung hari ini.
-                                    </td>
-                                </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{{-- Quick Actions --}}
+<div class="quick-actions">
+    <a href="{{ route('items.index') }}" class="quick-action inventory">
+        <div class="quick-action-icon"><i class="bi bi-box-seam-fill"></i></div>
+        <div class="quick-action-text">
+            <h6>Inventaris</h6>
+            <p>Kelola barang lab</p>
+        </div>
+    </a>
+    <a href="{{ route('admin.borrowings.index') }}" class="quick-action borrowing">
+        <div class="quick-action-icon"><i class="bi bi-arrow-left-right"></i></div>
+        <div class="quick-action-text">
+            <h6>Peminjaman</h6>
+            <p>{{ $activeBorrowings->count() }} barang aktif</p>
+        </div>
+    </a>
+    <a href="{{ route('admin.visits.index') }}" class="quick-action visits">
+        <div class="quick-action-icon"><i class="bi bi-people-fill"></i></div>
+        <div class="quick-action-text">
+            <h6>Kunjungan</h6>
+            <p>{{ $todaysVisits->count() }} hari ini</p>
+        </div>
+    </a>
+</div>
 
-</body>
-</html>
+{{-- Stats Grid --}}
+<div class="stats-grid">
+    <div class="card stat-card primary">
+        <div class="stat-icon"><i class="bi bi-calendar-check-fill"></i></div>
+        <div class="stat-value">{{ now()->format('d') }}</div>
+        <div class="stat-label">{{ now()->isoFormat('MMMM Y') }}</div>
+    </div>
+    <div class="card stat-card success">
+        <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
+        <div class="stat-value">{{ $uniqueVisitorsCount ?? $todaysVisits->count() }}</div>
+        <div class="stat-label">Pengunjung Hari Ini</div>
+        <div class="stat-trend up"><i class="bi bi-arrow-up"></i> Aktif</div>
+    </div>
+    <div class="card stat-card warning">
+        <div class="stat-icon"><i class="bi bi-hourglass-split"></i></div>
+        <div class="stat-value">{{ $activeBorrowings->count() }}</div>
+        <div class="stat-label">Sedang Dipinjam</div>
+    </div>
+    <div class="card stat-card info">
+        <div class="stat-icon"><i class="bi bi-graph-up-arrow"></i></div>
+        <div class="stat-value">{{ $todaysVisits->count() }}</div>
+        <div class="stat-label">Total Kunjungan</div>
+    </div>
+</div>
+
+{{-- Charts Row --}}
+<div class="row g-4 mb-4">
+    <div class="col-lg-8">
+        <div class="card chart-card">
+            <div class="card-header">
+                <h6 class="card-title"><i class="bi bi-graph-up"></i> Statistik Pengunjung</h6>
+                <span class="badge badge-primary">7 Hari Terakhir</span>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="visitorsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card chart-card">
+            <div class="card-header">
+                <h6 class="card-title"><i class="bi bi-pie-chart-fill"></i> Tujuan Kunjungan</h6>
+            </div>
+            <div class="card-body">
+                @if(isset($purposeDistribution) && ($purposeDistribution['belajar'] > 0 || $purposeDistribution['pinjam'] > 0))
+                <div class="chart-container">
+                    <canvas id="purposeChart"></canvas>
+                </div>
+                @else
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="bi bi-pie-chart"></i></div>
+                    <h6>Belum Ada Data</h6>
+                    <p>Data akan muncul setelah ada kunjungan</p>
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Activity Row --}}
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card activity-card">
+            <div class="card-header">
+                <h6 class="card-title"><i class="bi bi-exclamation-circle-fill text-warning"></i> Peminjaman Aktif</h6>
+                <a href="{{ route('admin.borrowings.index', ['status' => 'dipinjam']) }}" class="btn btn-ghost btn-sm">Lihat Semua</a>
+            </div>
+            <div class="card-body">
+                @forelse($activeBorrowings->take(5) as $borrow)
+                <div class="activity-item">
+                    <div class="activity-avatar pinjam">{{ strtoupper(substr($borrow->visit->visitor_name ?? 'U', 0, 1)) }}</div>
+                    <div class="activity-info">
+                        <div class="activity-name">{{ $borrow->visit->visitor_name ?? 'Unknown' }}</div>
+                        <div class="activity-detail">{{ $borrow->item->name ?? 'Item' }} • {{ $borrow->quantity }} unit</div>
+                    </div>
+                    <div class="activity-time">{{ $borrow->created_at->diffForHumans() }}</div>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#returnModal{{ $borrow->id }}">Terima</button>
+                </div>
+                {{-- Return Modal --}}
+                <div class="modal fade" id="returnModal{{ $borrow->id }}" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered modal-sm">
+                        <div class="modal-content">
+                            <div class="modal-body text-center p-4">
+                                <div class="mb-3">
+                                    <div style="width:64px;height:64px;background:rgba(99,102,241,0.15);border-radius:50%;display:inline-flex;align-items:center;justify-content:center">
+                                        <i class="bi bi-check-lg fs-2" style="color:var(--primary)"></i>
+                                    </div>
+                                </div>
+                                <h6 class="fw-bold mb-2">Konfirmasi Pengembalian</h6>
+                                <p class="text-muted small mb-3">Terima {{ $borrow->quantity }} {{ $borrow->item->name ?? 'item' }} dari {{ $borrow->visit->visitor_name ?? 'Unknown' }}?</p>
+                                <div class="d-flex gap-2 justify-content-center">
+                                    <button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Batal</button>
+                                    <form action="{{ route('admin.return', $borrow->id) }}" method="POST">
+                                        @csrf
+                                        <button type="submit" class="btn btn-primary">Ya, Terima</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @empty
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="bi bi-check-circle"></i></div>
+                    <h6>Semua Dikembalikan</h6>
+                    <p>Tidak ada peminjaman aktif</p>
+                </div>
+                @endforelse
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card activity-card">
+            <div class="card-header">
+                <h6 class="card-title"><i class="bi bi-clock-history text-info"></i> Kunjungan Terbaru</h6>
+                <a href="{{ route('admin.visits.index') }}" class="btn btn-ghost btn-sm">Lihat Semua</a>
+            </div>
+            <div class="card-body">
+                @forelse($todaysVisits->take(5) as $visit)
+                <div class="activity-item">
+                    <div class="activity-avatar {{ $visit->purpose }}">{{ strtoupper(substr($visit->visitor_name, 0, 1)) }}</div>
+                    <div class="activity-info">
+                        <div class="activity-name">{{ $visit->visitor_name }}</div>
+                        <div class="activity-detail">{{ $visit->visitor_id }} • {{ $visit->purpose === 'belajar' ? 'Belajar' : 'Meminjam' }}</div>
+                    </div>
+                    <div class="activity-time">{{ $visit->created_at->format('H:i') }}</div>
+                </div>
+                @empty
+                <div class="empty-state">
+                    <div class="empty-state-icon"><i class="bi bi-calendar-x"></i></div>
+                    <h6>Belum Ada Kunjungan</h6>
+                    <p>Belum ada kunjungan hari ini</p>
+                </div>
+                @endforelse
+            </div>
+        </div>
+    </div>
+</div>
+@endsection
+
+@section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? '#334155' : '#e2e8f0';
+    
+    Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+    Chart.defaults.color = textColor;
+    
+    @if(isset($dailyVisitorCounts))
+    new Chart(document.getElementById('visitorsChart'), {
+        type: 'line',
+        data: {
+            labels: {!! json_encode($dailyVisitorCounts->pluck('date')->map(fn($d) => \Carbon\Carbon::parse($d)->format('d M'))) !!},
+            datasets: [{
+                label: 'Pengunjung',
+                data: {!! json_encode($dailyVisitorCounts->pluck('visitor_count')) !!},
+                fill: true,
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                borderColor: '#6366f1',
+                borderWidth: 3,
+                tension: 0.4,
+                pointBackgroundColor: '#6366f1',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: gridColor } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+    @endif
+
+    @if(isset($purposeDistribution) && ($purposeDistribution['belajar'] > 0 || $purposeDistribution['pinjam'] > 0))
+    new Chart(document.getElementById('purposeChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Belajar', 'Meminjam'],
+            datasets: [{
+                data: [{{ $purposeDistribution['belajar'] }}, {{ $purposeDistribution['pinjam'] }}],
+                backgroundColor: ['#06b6d4', '#f59e0b'],
+                borderWidth: 0,
+                hoverOffset: 10
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } } },
+            cutout: '65%'
+        }
+    });
+    @endif
+});
+</script>
+@endsection

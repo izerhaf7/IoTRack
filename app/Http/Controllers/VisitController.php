@@ -4,132 +4,133 @@ namespace App\Http\Controllers;
 
 use App\Models\Visit;
 use App\Models\Item;
-use App\Models\Borrowing;
-use App\Models\Student;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Http\Requests\TapInRequest;
+use App\Http\Requests\TapOutRequest;
+use App\Services\VisitService;
+use Illuminate\Validation\ValidationException;
 
+/**
+ * Controller untuk mengelola kunjungan lab (Tap In dan Tap Out).
+ * Controller ini hanya menangani HTTP concerns, logika bisnis didelegasikan ke VisitService.
+ */
 class VisitController extends Controller
 {
-    // 1. Form Tap In
+    /**
+     * Service untuk logika bisnis kunjungan.
+     */
+    protected VisitService $visitService;
+
+    /**
+     * Konstruktor dengan dependency injection.
+     *
+     * @param VisitService $visitService
+     */
+    public function __construct(VisitService $visitService)
+    {
+        $this->visitService = $visitService;
+    }
+
+    /**
+     * Menampilkan form Tap In.
+     * Mengambil daftar barang yang tersedia untuk dipinjam.
+     *
+     * @return \Illuminate\View\View
+     */
     public function create()
     {
+        // Ambil barang dengan stok tersedia
         $items = Item::where('current_stock', '>', 0)->get();
 
         return view('visit.form', compact('items'));
     }
 
-    // 2. Proses Tap In
-    public function store(Request $request)
+    /**
+     * Memproses Tap In menggunakan VisitService.
+     * Validasi dilakukan oleh TapInRequest.
+     *
+     * @param TapInRequest $request Request yang sudah divalidasi
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function store(TapInRequest $request)
     {
-        $request->validate([
-            'visitor_id' => 'required',                     // NIM saja
-            'purpose'    => 'required|in:belajar,pinjam',
-            'item_id'    => 'nullable|required_if:purpose,pinjam',
-            'quantity'   => 'nullable|required_if:purpose,pinjam|integer|min:1',
-        ]);
+        try {
+            // Delegasikan ke VisitService untuk proses Tap In
+            $visit = $this->visitService->tapIn($request->validated());
 
-        // Cari mahasiswa berdasarkan NIM
-        $student = Student::where('nim', $request->visitor_id)->first();
+            return redirect()->route('visit.welcome', $visit->id);
 
-        if (!$student) {
+        } catch (ValidationException $e) {
+            // Tangkap error validasi dari service (NIM tidak terdaftar, stok tidak cukup)
+            $errors = $e->errors();
+            $errorMessage = collect($errors)->flatten()->first() ?? 'Terjadi kesalahan saat proses Tap In.';
+            
             return back()
                 ->withInput()
-                ->with('error', 'NIM tidak terdaftar di data mahasiswa.');
+                ->with('error', $errorMessage);
         }
-
-        // Cek stok kalau meminjam
-        if ($request->purpose === 'pinjam') {
-            $item = Item::findOrFail($request->item_id);
-
-            if ($item->current_stock < $request->quantity) {
-                return back()
-                    ->withInput()
-                    ->with('error', 'Stok barang '.$item->name.' hanya tersisa '.$item->current_stock.' unit.');
-            }
-        }
-
-        // Simpan visit + borrowing di dalam transaksi
-        DB::transaction(function () use ($request, $student, &$visit) {
-
-            // Simpan data kunjungan
-            $visit = Visit::create([
-                'visitor_name' => $student->name,   // otomatis dari tabel students
-                'visitor_id'   => $student->nim,
-                'purpose'      => $request->purpose,
-            ]);
-
-            if ($request->purpose === 'pinjam') {
-                $item = Item::lockForUpdate()->findOrFail($request->item_id);
-
-                Borrowing::create([
-                    'visit_id' => $visit->id,
-                    'item_id'  => $item->id,
-                    'quantity' => $request->quantity,
-                    'status'   => 'dipinjam',
-                ]);
-
-                $item->decrement('current_stock', $request->quantity);
-            }
-        });
-
-        // Setelah sukses, arahkan ke halaman "Selamat Datang"
-        return redirect()->route('visit.welcome', $visit->id);
     }
 
-    // 3. Halaman sambutan setelah Tap In
+    /**
+     * Menampilkan halaman sambutan setelah Tap In berhasil.
+     *
+     * @param Visit $visit Instance kunjungan
+     * @return \Illuminate\View\View
+     */
     public function welcome(Visit $visit)
     {
         return view('visit.welcome', compact('visit'));
     }
 
-    // 4. Form Tap Out tetap seperti punyamu (NIM saja)
+    /**
+     * Menampilkan form Tap Out.
+     *
+     * @return \Illuminate\View\View
+     */
     public function tapOutForm()
     {
         return view('visit.tap-out');
     }
 
-    // 5. Proses Tap Out -> redirect ke halaman ucapan penutup
-    public function tapOutProcess(Request $request)
+    /**
+     * Memproses Tap Out menggunakan VisitService.
+     * Validasi dilakukan oleh TapOutRequest dan VisitService.
+     * 
+     * Requirements: 1.1, 1.2, 1.3, 1.4, 2.3, 2.4, 2.5, 10.4
+     *
+     * @param TapOutRequest $request Request yang sudah divalidasi
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function tapOutProcess(TapOutRequest $request)
     {
-        $request->validate([
-            'visitor_id' => 'required'
-        ]);
+        try {
+            // Delegasikan ke VisitService untuk proses Tap Out dengan validasi lengkap
+            // - Validasi peminjaman aktif (Requirement 1.1, 1.3)
+            // - Validasi duplikat Tap Out (Requirement 2.3)
+            // - Proses pengembalian dalam transaksi (Requirement 2.5)
+            $visit = $this->visitService->tapOut($request->validated()['visitor_id']);
 
-        $visits = Visit::where('visitor_id', $request->visitor_id)->get();
+            return redirect()->route('visit.goodbye', ['visitor_id' => $request->visitor_id]);
 
-        if ($visits->isEmpty()) {
-            return back()->with('error', 'Data kunjungan tidak ditemukan untuk NIM tersebut.');
+        } catch (ValidationException $e) {
+            // Tampilkan pesan error dalam Bahasa Indonesia (Requirement 10.4)
+            $errors = $e->errors();
+            $errorMessage = $errors['visitor_id'][0] ?? 'Terjadi kesalahan saat proses Tap Out.';
+            
+            return back()
+                ->withInput()
+                ->with('error', $errorMessage);
         }
-
-        DB::transaction(function () use ($visits) {
-            foreach ($visits as $visit) {
-                $borrowings = Borrowing::where('visit_id', $visit->id)->get();
-
-                foreach ($borrowings as $borrow) {
-                    $item = $borrow->item;
-
-                    if ($item) {
-                        $newStock = $item->current_stock + $borrow->quantity;
-                        $item->current_stock = min($newStock, $item->total_stock);
-                        $item->save();
-                    }
-
-                    // JANGAN delete; cukup update status agar histori tetap ada
-                    $borrow->update([
-                        'status'      => 'dikembalikan',
-                        'returned_at' => now(),
-                    ]);
-                }
-            }
-        });
-
-        return redirect()->route('visit.goodbye', ['visitor_id' => $request->visitor_id]);
     }
 
-    // 6. Halaman ucapan setelah Tap Out
+    /**
+     * Menampilkan halaman ucapan setelah Tap Out berhasil.
+     *
+     * @param string $visitor_id NIM pengunjung
+     * @return \Illuminate\View\View
+     */
     public function goodbye($visitor_id)
     {
+        // Ambil kunjungan terakhir untuk mendapatkan nama pengunjung
         $latestVisit = Visit::where('visitor_id', $visitor_id)->latest()->first();
 
         $name = $latestVisit?->visitor_name ?? 'Pengunjung';
